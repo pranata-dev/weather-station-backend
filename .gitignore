@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+AGENTS.md
+CLAUDE.md
