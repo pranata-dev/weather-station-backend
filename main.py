@@ -8,3 +8,7 @@ app.include_router(sensor.router, prefix="/api/v1/sensor")
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Weather Station API is running"}
