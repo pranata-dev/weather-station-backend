@@ -19,7 +19,9 @@ def init_db():
                 uv_index INTEGER,
                 rain REAL,
                 pm1 REAL,
-                pm2_5 REAL
+                pm2_5 REAL,
+                lat REAL,
+                lon REAL
             )
         """)
         conn.commit()
@@ -107,22 +109,39 @@ def get_telemetry_history(limit: int = 100) -> list[dict]:
     finally:
         conn.close()
 
-def update_latest_pm_data(pm1: float, pm2_5: float) -> bool:
+def update_latest_pm_data(pm1: float, pm2_5: float, lat: float = None, lon: float = None) -> bool:
     conn = sqlite3.connect(DB_FILE)
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE weather_telemetry
-            SET pm1 = ?, pm2_5 = ?
-            WHERE id = (
-                SELECT id FROM weather_telemetry
-                ORDER BY timestamp DESC
-                LIMIT 1
+        
+        # Logika dinamis: Update GPS hanya jika koordinat valid dikirim (tidak None)
+        if lat is not None and lon is not None:
+            cursor.execute(
+                """
+                UPDATE weather_telemetry
+                SET pm1 = ?, pm2_5 = ?, lat = ?, lon = ?
+                WHERE id = (
+                    SELECT id FROM weather_telemetry
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                )
+                """,
+                (pm1, pm2_5, lat, lon)
             )
-            """,
-            (pm1, pm2_5)
-        )
+        else:
+            cursor.execute(
+                """
+                UPDATE weather_telemetry
+                SET pm1 = ?, pm2_5 = ?
+                WHERE id = (
+                    SELECT id FROM weather_telemetry
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                )
+                """,
+                (pm1, pm2_5)
+            )
+            
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:

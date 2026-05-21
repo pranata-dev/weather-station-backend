@@ -10,11 +10,9 @@ def fahrenheit_to_celsius(f: float) -> float:
 @router.post("/data")
 async def receive_sensor_data(request: Request):
     try:
-        # 5-Minute Throttle Mechanism
         latest = get_latest_telemetry()
         if latest and "timestamp" in latest:
             try:
-                # SQLite CURRENT_TIMESTAMP uses "YYYY-MM-DD HH:MM:SS" (UTC)
                 latest_time = datetime.datetime.strptime(latest["timestamp"], "%Y-%m-%d %H:%M:%S")
                 latest_time = latest_time.replace(tzinfo=datetime.timezone.utc)
                 current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -64,7 +62,6 @@ async def receive_sensor_data(request: Request):
         )
 
         print("Successfully inserted 10 telemetry parameters.")
-        
         return {"status": "success"}
 
     except Exception as e:
@@ -95,11 +92,20 @@ async def receive_pm_data(request: Request):
         
         pm1 = float(payload.get("pm1", 0.0))
         pm2_5 = float(payload.get("pm2_5", payload.get("pm25", 0.0)))
+        
+        # Tangkap lat dan lon dari payload ESP32
+        lat = payload.get("lat")
+        lon = payload.get("lon")
+        
+        # Konversi ke float jika tidak None
+        if lat is not None and lon is not None:
+            lat = float(lat)
+            lon = float(lon)
 
-        updated = update_latest_pm_data(pm1=pm1, pm2_5=pm2_5)
+        updated = update_latest_pm_data(pm1=pm1, pm2_5=pm2_5, lat=lat, lon=lon)
 
         if updated:
-            print(f"PM data merged into latest row: PM1={pm1}, PM2.5={pm2_5}")
+            print(f"PM data merged: PM1={pm1}, PM2.5={pm2_5}, Lat={lat}, Lon={lon}")
             return {"status": "success"}
         else:
             print("PM update failed: no existing telemetry row found.")
