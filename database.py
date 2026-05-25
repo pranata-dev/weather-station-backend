@@ -11,7 +11,6 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 station_code TEXT UNIQUE,
                 name TEXT,
-                mac_address TEXT UNIQUE,
                 api_key TEXT UNIQUE,
                 location TEXT,
                 access_password TEXT,
@@ -64,16 +63,16 @@ def get_station_by_code(station_code: str) -> dict | None:
     finally:
         conn.close()
 
-def register_station(station_code: str, name: str, mac_address: str, api_key: str, location: str, access_password: str) -> bool:
+def register_station(station_code: str, name: str, api_key: str, location: str, access_password: str) -> bool:
     conn = sqlite3.connect(DB_FILE)
     try:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO stations (station_code, name, mac_address, api_key, location, access_password)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO stations (station_code, name, api_key, location, access_password)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (station_code, name, mac_address, api_key, location, access_password)
+            (station_code, name, api_key, location, access_password)
         )
         conn.commit()
         return True
@@ -88,7 +87,7 @@ def list_stations() -> list[dict]:
     try:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT id, station_code, name, mac_address, api_key, location, created_at FROM stations")
+        cursor.execute("SELECT id, station_code, name, api_key, location, created_at FROM stations")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
     except sqlite3.Error as e:
