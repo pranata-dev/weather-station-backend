@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 import datetime
-from database import insert_sensor_data, get_latest_telemetry, get_telemetry_history, update_latest_pm_data
+from database import insert_sensor_data, get_latest_telemetry, get_telemetry_history, update_latest_pm_data, get_station_by_api_key
 
 router = APIRouter()
 
@@ -10,7 +10,17 @@ def fahrenheit_to_celsius(f: float) -> float:
 @router.post("/data")
 async def receive_sensor_data(request: Request):
     try:
-        latest = get_latest_telemetry()
+        form_data = await request.form()
+        
+        api_key = form_data.get("PASSKEY")
+        if not api_key:
+            raise HTTPException(status_code=401, detail="Unauthorized: PASSKEY missing")
+            
+        station = get_station_by_api_key(api_key)
+        if not station:
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid PASSKEY")
+
+        latest = get_latest_telemetry(api_key=api_key)
         if latest and "timestamp" in latest:
             try:
                 latest_time = datetime.datetime.strptime(latest["timestamp"], "%Y-%m-%d %H:%M:%S")
@@ -22,8 +32,6 @@ async def receive_sensor_data(request: Request):
                     return {"status": "skipped", "message": "Throttled"}
             except Exception as e:
                 print(f"Throttle time parsing error: {e}")
-
-        form_data = await request.form()
         
         temp_f = float(form_data.get("tempf", 0.0))
         temperature = fahrenheit_to_celsius(temp_f)
@@ -49,6 +57,7 @@ async def receive_sensor_data(request: Request):
         pm2_5 = float(form_data.get("pm25_ch1", form_data.get("pm25", 0.0)))
 
         insert_sensor_data(
+            api_key=api_key,
             temperature=temperature,
             humidity=humidity,
             pressure=pressure,
@@ -61,23 +70,25 @@ async def receive_sensor_data(request: Request):
             pm2_5=pm2_5
         )
 
-        print("Successfully inserted 10 telemetry parameters.")
+        print(f"Successfully inserted telemetry for station: {station['station_code']}")
         return {"status": "success"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error parsing data: {e}")
         return {"status": "error parsing, but connection OK"}
 
 @router.get("/latest")
-async def get_latest():
-    data = get_latest_telemetry()
+async def get_latest(api_key: str = None):
+    data = get_latest_telemetry(api_key=api_key)
     if data is None:
         raise HTTPException(status_code=404, detail="No telemetry data found")
     return {"status": "success", "data": data}
 
 @router.get("/history")
-async def get_history(limit: int = 100):
-    data = get_telemetry_history(limit)
+async def get_history(limit: int = 100, api_key: str = None):
+    data = get_telemetry_history(limit=limit, api_key=api_key)
     return {"status": "success", "data": data}
 
 @router.post("/pm")
@@ -89,28 +100,36 @@ async def receive_pm_data(request: Request):
             payload = await request.json()
         else:
             payload = dict(await request.form())
+            
+        api_key = payload.get("PASSKEY") or payload.get("api_key")
+        if not api_key:
+            raise HTTPException(status_code=401, detail="Unauthorized: PASSKEY/api_key missing")
+            
+        station = get_station_by_api_key(api_key)
+        if not station:
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid PASSKEY")
         
         pm1 = float(payload.get("pm1", 0.0))
         pm2_5 = float(payload.get("pm2_5", payload.get("pm25", 0.0)))
         
-        # Tangkap lat dan lon dari payload ESP32
         lat = payload.get("lat")
         lon = payload.get("lon")
         
-        # Konversi ke float jika tidak None
         if lat is not None and lon is not None:
             lat = float(lat)
             lon = float(lon)
 
-        updated = update_latest_pm_data(pm1=pm1, pm2_5=pm2_5, lat=lat, lon=lon)
+        updated = update_latest_pm_data(pm1=pm1, pm2_5=pm2_5, api_key=api_key, lat=lat, lon=lon)
 
         if updated:
-            print(f"PM data merged: PM1={pm1}, PM2.5={pm2_5}, Lat={lat}, Lon={lon}")
+            print(f"PM data merged for {station['station_code']}: PM1={pm1}, PM2.5={pm2_5}, Lat={lat}, Lon={lon}")
             return {"status": "success"}
         else:
-            print("PM update failed: no existing telemetry row found.")
+            print(f"PM update failed: no existing telemetry row found for {station['station_code']}.")
             return {"status": "error", "message": "No telemetry row to update"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error parsing PM data: {e}")
         return {"status": "error", "message": str(e)}
