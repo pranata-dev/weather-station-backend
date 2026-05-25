@@ -53,6 +53,17 @@ def get_station_by_api_key(api_key: str) -> dict | None:
     finally:
         conn.close()
 
+def get_station_by_code(station_code: str) -> dict | None:
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM stations WHERE station_code = ?", (station_code,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
 def register_station(station_code: str, name: str, mac_address: str, api_key: str, location: str, access_password: str) -> bool:
     conn = sqlite3.connect(DB_FILE)
     try:
@@ -80,6 +91,62 @@ def list_stations() -> list[dict]:
         cursor.execute("SELECT id, station_code, name, mac_address, api_key, location, created_at FROM stations")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return []
+    finally:
+        conn.close()
+
+def list_stations_with_latest() -> list[dict]:
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        query = """
+            SELECT 
+                s.station_code, s.name, s.location, s.api_key,
+                w.temperature, w.humidity, w.pressure, w.wind_direction, w.wind_speed,
+                w.solar_radiation, w.uv_index, w.rain, w.pm1, w.pm2_5, w.lat, w.lon, w.timestamp
+            FROM stations s
+            LEFT JOIN (
+                SELECT api_key, MAX(timestamp) as max_ts
+                FROM weather_telemetry
+                GROUP BY api_key
+            ) latest ON s.api_key = latest.api_key
+            LEFT JOIN weather_telemetry w ON latest.api_key = w.api_key AND latest.max_ts = w.timestamp
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        result = []
+        for row in rows:
+            r = dict(row)
+            # Group telemetry into latestData
+            station_data = {
+                "station_code": r["station_code"],
+                "name": r["name"],
+                "location": r["location"],
+                "api_key": r["api_key"],
+                "latestData": None
+            }
+            if r["timestamp"]:
+                station_data["latestData"] = {
+                    "temperature": r["temperature"],
+                    "humidity": r["humidity"],
+                    "pressure": r["pressure"],
+                    "wind_direction": r["wind_direction"],
+                    "wind_speed": r["wind_speed"],
+                    "solar_radiation": r["solar_radiation"],
+                    "uv_index": r["uv_index"],
+                    "rain": r["rain"],
+                    "pm1": r["pm1"],
+                    "pm2_5": r["pm2_5"],
+                    "lat": r["lat"],
+                    "lon": r["lon"],
+                    "timestamp": r["timestamp"],
+                }
+            result.append(station_data)
+        return result
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         return []

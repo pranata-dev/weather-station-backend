@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 import datetime
-from database import insert_sensor_data, get_latest_telemetry, get_telemetry_history, update_latest_pm_data, get_station_by_api_key
+from database import insert_sensor_data, get_latest_telemetry, get_telemetry_history, update_latest_pm_data, get_station_by_api_key, get_station_by_code
 
 router = APIRouter()
 
@@ -80,14 +80,28 @@ async def receive_sensor_data(request: Request):
         return {"status": "error parsing, but connection OK"}
 
 @router.get("/latest")
-async def get_latest(api_key: str = None):
+async def get_latest(station_code: str = None):
+    api_key = None
+    if station_code:
+        station = get_station_by_code(station_code)
+        if not station:
+            raise HTTPException(status_code=404, detail="Station not found")
+        api_key = station["api_key"]
+        
     data = get_latest_telemetry(api_key=api_key)
     if data is None:
         raise HTTPException(status_code=404, detail="No telemetry data found")
     return {"status": "success", "data": data}
 
 @router.get("/history")
-async def get_history(limit: int = 100, api_key: str = None):
+async def get_history(limit: int = 100, station_code: str = None):
+    api_key = None
+    if station_code:
+        station = get_station_by_code(station_code)
+        if not station:
+            raise HTTPException(status_code=404, detail="Station not found")
+        api_key = station["api_key"]
+        
     data = get_telemetry_history(limit=limit, api_key=api_key)
     return {"status": "success", "data": data}
 

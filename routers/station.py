@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import hashlib
-from database import register_station, list_stations
+from database import register_station, list_stations_with_latest
 
 router = APIRouter()
 
@@ -34,5 +34,5 @@ async def register(station: StationRegistration):
 
 @router.get("/list")
 async def list_all_stations():
-    stations = list_stations()
+    stations = list_stations_with_latest()
     return {"status": "success", "data": stations}
