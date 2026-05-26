@@ -82,6 +82,27 @@ def register_station(station_code: str, name: str, api_key: str, location: str, 
     finally:
         conn.close()
 
+def update_station_details(station_code: str, name: str, location: str) -> bool:
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE stations 
+            SET name = ?, location = ?
+            WHERE station_code = ?
+            """,
+            (name, location, station_code)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 def list_stations() -> list[dict]:
     conn = sqlite3.connect(DB_FILE)
     try:

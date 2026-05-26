@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel
 import hashlib
-from database import register_station, list_stations_with_latest
+from database import register_station, list_stations_with_latest, update_station_details
 
 router = APIRouter()
 
@@ -31,3 +31,15 @@ async def register(station: StationRegistration):
 async def list_all_stations():
     stations = list_stations_with_latest()
     return {"status": "success", "data": stations}
+
+class StationUpdate(BaseModel):
+    name: str
+    location: str
+
+@router.put("/update/{station_code}")
+async def update_station(station_code: str, update_data: StationUpdate):
+    success = update_station_details(station_code, update_data.name, update_data.location)
+    if success:
+        return {"status": "success", "message": "Station updated successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Station not found or update failed")
