@@ -53,8 +53,15 @@ async def receive_sensor_data(request: Request):
         dailyrainin = float(form_data.get("dailyrainin", 0.0))
         rain = round(dailyrainin * 25.4, 2)
         
-        pm1 = float(form_data.get("pm1_ch1", form_data.get("pm1", 0.0)))
-        pm2_5 = float(form_data.get("pm25_ch1", form_data.get("pm25", 0.0)))
+        current_latest = get_latest_telemetry(api_key=api_key)
+        
+        last_pm1 = current_latest["pm1"] if current_latest and current_latest.get("pm1") is not None else 0.0
+        last_pm25 = current_latest["pm2_5"] if current_latest and current_latest.get("pm2_5") is not None else 0.0
+        last_lat = current_latest["lat"] if current_latest and current_latest.get("lat") is not None else None
+        last_lon = current_latest["lon"] if current_latest and current_latest.get("lon") is not None else None
+
+        pm1 = float(form_data.get("pm1_ch1", form_data.get("pm1", last_pm1)))
+        pm2_5 = float(form_data.get("pm25_ch1", form_data.get("pm25", last_pm25)))
 
         insert_sensor_data(
             api_key=api_key,
@@ -67,7 +74,9 @@ async def receive_sensor_data(request: Request):
             uv_index=uv_index,
             rain=rain,
             pm1=pm1,
-            pm2_5=pm2_5
+            pm2_5=pm2_5,
+            lat=last_lat,
+            lon=last_lon
         )
 
         print(f"Successfully inserted telemetry for station: {station['station_code']}")

@@ -184,7 +184,9 @@ def insert_sensor_data(
     uv_index: int,
     rain: float,
     pm1: float,
-    pm2_5: float
+    pm2_5: float,
+    lat: float = None,
+    lon: float = None
 ):
     conn = sqlite3.connect(DB_FILE)
     try:
@@ -193,13 +195,13 @@ def insert_sensor_data(
             """
             INSERT INTO weather_telemetry (
                 api_key, temperature, humidity, pressure, wind_direction, wind_speed,
-                solar_radiation, uv_index, rain, pm1, pm2_5
+                solar_radiation, uv_index, rain, pm1, pm2_5, lat, lon
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 api_key, temperature, humidity, pressure, wind_direction, wind_speed,
-                solar_radiation, uv_index, rain, pm1, pm2_5
+                solar_radiation, uv_index, rain, pm1, pm2_5, lat, lon
             )
         )
         conn.commit()
